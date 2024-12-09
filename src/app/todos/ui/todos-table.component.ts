@@ -14,7 +14,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     <section>
       <mat-card>
         @if (loading()) {
-          <mat-progress-spinner mode="indeterminate" diameter="100"></mat-progress-spinner>
+          <section class="spinner-container">
+            <mat-progress-spinner mode="indeterminate" diameter="100"></mat-progress-spinner>
+          </section>
         }
         @else {
           <table mat-table [dataSource]="data()">
@@ -58,6 +60,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
         width: 800px;
         margin: 20px 10px;
         padding: 20px 0;
+      }
+
+      .spinner-container {
+        display: flex;
+        justify-content: center;
       }
 
       section {

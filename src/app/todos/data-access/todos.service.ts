@@ -15,7 +15,7 @@ export interface TodosState {
 
 @Injectable()
 export class TodosService {
-  private readonly http = inject(HttpClient);
+  readonly #http = inject(HttpClient);
 
   //state
   readonly #state = signal<TodosState>({
@@ -35,10 +35,8 @@ export class TodosService {
 
   //soruces
   pagination$ = new Subject<Pagination>();
-  completedFilter$ = new Subject<boolean | null>();
-
-  constructor() {  
-    this.pagination$.pipe(
+  readonly #paginated$ = this.pagination$
+    .pipe(
       takeUntilDestroyed(),
       startWith({page: this.page(), pageSize: this.pageSize()}),
       tap((page) => {
@@ -46,19 +44,26 @@ export class TodosService {
           ({ ...state, page: page.page, pageSize: page.pageSize, loading: true }));
       }),
       switchMap(() => this.getTodos()),
-    ).subscribe(todos => {
-      this.#state.update((state) =>
-        ({ ...state, todos, loading: false }))
-    });
+    );
 
-    this.completedFilter$.pipe(
+  completedFilter$ = new Subject<boolean | null>();
+  readonly #filtered$ = this.completedFilter$
+    .pipe(
       takeUntilDestroyed(),
       tap((filter) => {
         this.#state.update((state) =>
           ({ ...state, completedFilter: filter, loading: true }));
       }),
       switchMap(() => this.getTodos()),
-    ).subscribe(todos => {
+    );
+
+  constructor() {  
+    this.#paginated$.subscribe(todos => {
+      this.#state.update((state) =>
+        ({ ...state, todos, loading: false }))
+    });
+
+    this.#filtered$.subscribe(todos => {
       this.#state.update((state) =>
         ({ ...state, todos, loading: false }))
     });
@@ -71,6 +76,6 @@ export class TodosService {
       url += `&completed=${this.completedFilter()}`;
     }
 
-    return this.http.get<Todo[]>(url);
+    return this.#http.get<Todo[]>(url);
   }
 }
