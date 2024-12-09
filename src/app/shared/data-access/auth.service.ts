@@ -1,4 +1,4 @@
-import { computed, DestroyRef, inject, Injectable, signal } from "@angular/core";
+import { computed, inject, Injectable, signal } from "@angular/core";
 import { AuthRecord } from 'pocketbase';
 import { catchError, EMPTY, from, fromEventPattern, Subject, switchMap, tap } from "rxjs";
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -17,8 +17,7 @@ export interface AuthState {
 })
 export class AuthService {
   client = inject(PocketBaseService).client;
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
   //state
   readonly #state = signal<AuthState>({
@@ -36,24 +35,49 @@ export class AuthService {
   //sources
   authStoreChanged$ = fromEventPattern<AuthRecord>(
     handler => this.client.authStore.onChange((...args) => handler(args[1]))
+  ).pipe(
+    takeUntilDestroyed(),
+    catchError((error) => {
+      this.#state.update((state) => ({
+        ...state,
+        loading: false,
+        error: error.message,
+      }));
+      return EMPTY;
+    })
   );
+
   login$ = new Subject<Credentials>();
+  readonly #loggedIn$ = this.login$.pipe(
+    takeUntilDestroyed(),
+    tap(() => {
+      this.#state.update((state) => ({
+        ...state,
+        loading: true,
+        error: null,
+      }));
+    }),
+    switchMap((credentials) => 
+      from(this.login(credentials)).pipe(
+        catchError((error) => {
+          this.#state.update((state) => ({
+            ...state,
+            loading: false,
+            error: error.message,
+          }));
+          return EMPTY;
+        })
+      )
+    ),
+  )
+
   logout$ = new Subject<void>();
+  readonly #loggedOut$ = this.logout$.pipe(takeUntilDestroyed());
 
   constructor() {
     this.initializeAuthState();
 
-    this.authStoreChanged$.pipe(
-      takeUntilDestroyed(),
-      catchError((error) => {
-        this.#state.update((state) => ({
-          ...state,
-          loading: false,
-          error: error.message,
-        }));
-        return EMPTY;
-      })
-    ).subscribe((user) => {
+    this.authStoreChanged$.subscribe((user) => {
       this.#state.update((state) => ({
         ...state,
         currentUser: user,
@@ -62,32 +86,11 @@ export class AuthService {
       }));
     });
 
-    this.login$.pipe(
-      takeUntilDestroyed(),
-      tap(() => {
-        this.#state.update((state) => ({
-          ...state,
-          loading: true,
-          error: null,
-        }));
-      }),
-      switchMap((credentials) => 
-        from(this.login(credentials)).pipe(
-          catchError((error) => {
-            this.#state.update((state) => ({
-              ...state,
-              loading: false,
-              error: error.message,
-            }));
-            return EMPTY;
-          })
-        )
-      ),
-    ).subscribe();
+    this.#loggedIn$.subscribe();
 
-    this.logout$.pipe(takeUntilDestroyed()).subscribe(() => {
+    this.#loggedOut$.subscribe(() => {
       this.client.authStore.clear();
-      this.router.navigate(['auth/login']);
+      this.#router.navigate(['auth/login']);
     });
   }
 
