@@ -49,7 +49,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
           </table>
           <mat-paginator [pageSize]="pageSize()" [pageSizeOptions]="[5, 10]"
-            [length]="200" [pageIndex]="pageIndex()" (page)="pageEvent($event)"></mat-paginator>
+            [length]="200" [pageIndex]="pageIndex()" (page)="pageEvent($event)">
+          </mat-paginator>
         }
       </mat-card>
     </section>
